@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 // using namespace std;
 
 //Custom Structures
@@ -11,7 +12,7 @@ struct Block {
 };
 //global variables
 //----------------------------------------------------------------
-const int OVRHDSIZE = sizeof(struct Block);
+const int OVRHDSIZE = sizeof(struct Block); //value is in bytes
 const int PTRSIZE = sizeof(void*);
 struct Block* FRHD = NULL;
 
@@ -50,7 +51,7 @@ void * myAlloc(int size);
 
 
 int main() {
-    myInitializeHeap(2);
+    myInitializeHeap(20);
     printf("overhead: %d, and pointer: %d  sizes\n",OVRHDSIZE, PTRSIZE);
     printBlock(FRHD);
     return 0;
@@ -62,6 +63,7 @@ void myInitializeHeap(int size) {
     // The -> operator accesses the field of an object that we have
     // a pointer to.
     FRHD->next_block = NULL;
+    FRHD->blockSize = size-OVRHDSIZE;
     // struct Block * temp = (struct Block*) malloc(OVRHDSIZE*size);
     // temp->blockSize = OVRHDSIZE*(size-1); //this may be wrong, not sure if i say i have the whole size when this block occupys space
     // temp->next_block = NULL;
@@ -74,7 +76,9 @@ void printBlock(const struct Block* block) {
 void * myAlloc(int size) {
     // TODO: if size is not a multiple of POINTER_SIZE, you
     // must round it *UP* to the next multiple.
-
+    if (size%PTRSIZE != 0) {
+        size = (int) floor(size/(double)PTRSIZE); //get the largest int back from the division and case back into int for size
+    }
 
 
     // From now on, we will assume that "size" has been adjusted
@@ -95,19 +99,15 @@ void * myAlloc(int size) {
     // 3. Perform the "walk through a linked list" logic that you
     // learned in 274.
     while (temp != NULL) { // keep going until we walk off the end of the list.
-        if (temp->blockSize >= size) {
-            // This block is big enough!
-            // If we were doing FIRST FIT, we would definitely break here.
-            // But this project uses BEST FIT, so you might NOT want
-            // to break on the next line. You may need to make a copy
-            // of temp to remember this block if it's the best fit that
-            // you've found so far!
-
-            chosen_block = temp; // this is FIRST FIT!
-            break;
+        if (temp->blockSize >= size) { //block is big enough
+            if (temp->blockSize <= chosen_block->blockSize) {//but is it smaller than the current block
+                chosen_block = temp;
+                if (chosen_block->blockSize == size);{break;} //stop loop if exact fit
+            }
         }
+        //move temp to next
+        temp = temp->next_block;
     }
-
     // 4. If we get here and chosen_block is NULL, that means we could not
     // find a block. A real heap allocator would throw an exception;
     // we will just return NULL;
@@ -115,6 +115,46 @@ void * myAlloc(int size) {
         return NULL;
     }
 
+    //should split if the size leftover is bigger than overhead size
+    if (chosen_block->blockSize - size > OVRHDSIZE) {
+        struct Block *new_block = (struct Block*)((char*)chosen_block + (OVRHDSIZE + size));
+        new_block->blockSize = chosen_block->blockSize - OVRHDSIZE - size;
+        chosen_block->blockSize = size;
+        //set sizes for both new block and chosen block
+        //new : is different of the current free block minus allocation size and overhead
+        //chosen: allocation size
+    
+        // new_block->next_block = chosen_block->next_block;
+        if (chosen_block == FRHD) //case splitting head
+        {
+            //block is the head block 
+            //we can make a new pointer struct to a size + overhead address and say its holding a difference of the selected block's att blcksz - ovrhd
+            // struct Block *new_block = (struct Block*)((char*)chosen_block + (OVRHDSIZE + size));
+            // new_block->blockSize = chosen_block->blockSize - OVRHDSIZE;
+            // chosen_block->blockSize = size;
+            // new_block->next_block = chosen_block->next_block; //new_block will be head so have it point to other free mem
+            FRHD = new_block;
+
+            //make new pointer from the chosen_block address plus overhead and size
+            //then adjust values for both new blocks
+            //set head to the new block
+        } else { //case splitting middle block
+            //block found is not the head, so there may not be a pointer to use,but that's okay
+
+            chosen_block->next_block = new_block;
+        }
+        
+    } else {
+        //can't split due to block not having enough space
+        if (chosen_block== FRHD) {
+            //block is head block but needs to be removed, normall this requires us to skip
+            chosen_block->blockSize = size;
+            FRHD = chosen_block->next_block;
+            //this could make FRHD point to nothing but hopefully not else no more space to allocate
+        } else {
+
+        }
+    }
     // Otherwise, we must decide:
     // a) Do we split the block? yes/no
     // b) Is this block the head node? yes/no
