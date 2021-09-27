@@ -1,3 +1,4 @@
+//William Murray 342 F 1-4pm
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
