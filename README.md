@@ -6,7 +6,8 @@ only implementing in the malloc and free functions into versions of myAlloc and 
 to build
 gcc -g -o main main.c -lm
 
-to run
+<strong>to run</strong>
+
 gdb main
   >run
 
